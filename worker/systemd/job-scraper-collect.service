@@ -1,12 +1,12 @@
 [Unit]
-Description=Job Scraper — coleta LinkedIn
+Description=Job Scraper — coleta LinkedIn + Gupy + Careerjet
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 WorkingDirectory=%h/projects/job-scraper/worker
-ExecStart=%h/botasaurus-env/bin/python run.py --source linkedin --once
+ExecStart=%h/botasaurus-env/bin/python run.py --source all --once
 # Coleta é I/O-bound; não deve competir com o resto da VM.
 Nice=10
 TimeoutStartSec=1800

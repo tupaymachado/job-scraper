@@ -1,6 +1,6 @@
 /** Espelha supabase/migrations/0001_init.sql. */
 
-export type JobSource = 'linkedin' | 'google_jobs'
+export type JobSource = 'linkedin' | 'gupy' | 'careerjet' | 'google_jobs'
 
 export type Seniority = 'estagio' | 'junior' | 'pleno' | 'senior' | 'staff' | 'lead'
 export type WorkModel = 'remoto' | 'hibrido' | 'presencial'
@@ -20,6 +20,12 @@ export interface Job {
   description_html: string | null
   description_text: string | null
   first_seen_at: string
+  /** NULL = esta é a vaga canônica. Preenchido = duplicata de outra fonte. */
+  canonical_id: string | null
+  /** Todas as fontes onde a vaga apareceu (denormalizado na canônica). */
+  sources: JobSource[]
+  /** Links das fontes alternativas. */
+  alt_urls: { source: JobSource; url: string }[]
 }
 
 export interface JobEnrichment {

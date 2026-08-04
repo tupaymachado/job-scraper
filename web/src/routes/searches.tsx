@@ -21,8 +21,10 @@ export const Route = createFileRoute('/searches')({
 })
 
 const ALL_SOURCES: { value: JobSource; label: string; hint: string }[] = [
-  { value: 'linkedin', label: 'LinkedIn', hint: '~50 vagas por rodada, a cada 6h' },
-  { value: 'google_jobs', label: 'Google Jobs', hint: '~10 vagas/dia, pode vir bloqueado' },
+  { value: 'linkedin', label: 'LinkedIn', hint: '~50 vagas por rodada, descrição completa' },
+  { value: 'gupy', label: 'Gupy', hint: 'ATS dominante no Brasil, ~500 vagas por termo' },
+  { value: 'careerjet', label: 'Careerjet', hint: 'Agregadora, com salário. Exige API key grátis' },
+  { value: 'google_jobs', label: 'Google Jobs', hint: '~10 vagas/dia, quase sempre bloqueado' },
 ]
 
 const emptyForm = {
@@ -30,7 +32,7 @@ const emptyForm = {
   keywords: '',
   location: 'Brazil',
   remote_only: false,
-  sources: ['linkedin'] as JobSource[],
+  sources: ['linkedin', 'gupy'] as JobSource[],
 }
 
 function Searches() {

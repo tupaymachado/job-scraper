@@ -52,6 +52,8 @@ class RawJob:
     description_html: str | None = None
     description_text: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    # Preenchido pelo store no momento da gravação (worker/dedup.py).
+    dedup_key: str | None = None
 
     def to_row(self) -> dict[str, Any]:
         row = asdict(self)

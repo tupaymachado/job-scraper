@@ -47,6 +47,8 @@ export function useJobsFeed(filters: FeedFilters) {
       let query = getSupabase()
         .from('jobs')
         .select('*, job_enrichments(*), job_matches(*), job_status(*)')
+        // Só canônicas: as duplicatas cross-source viram badges na canônica.
+        .is('canonical_id', null)
         .order('first_seen_at', { ascending: false })
         .range(pageParam, pageParam + PAGE_SIZE - 1)
 
@@ -55,7 +57,9 @@ export function useJobsFeed(filters: FeedFilters) {
         const term = filters.search.replace(/[,()]/g, ' ').trim()
         query = query.or(`title.ilike.%${term}%,company.ilike.%${term}%`)
       }
-      if (filters.source) query = query.eq('source', filters.source)
+      // contains, não eq: a vaga pode ter vindo do LinkedIn e também
+      // aparecer na Careerjet — filtrar por 'careerjet' deve achá-la.
+      if (filters.source) query = query.contains('sources', [filters.source])
       if (filters.seniority) query = query.eq('job_enrichments.seniority', filters.seniority)
       if (filters.workModel) query = query.eq('job_enrichments.work_model', filters.workModel)
 

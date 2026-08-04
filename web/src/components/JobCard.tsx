@@ -2,8 +2,10 @@ import { Link } from '@tanstack/react-router'
 import { one } from '../lib/types'
 import type { JobWithMeta } from '../lib/types'
 
-const SOURCE_LABEL: Record<string, string> = {
+export const SOURCE_LABEL: Record<string, string> = {
   linkedin: 'LinkedIn',
+  gupy: 'Gupy',
+  careerjet: 'Careerjet',
   google_jobs: 'Google Jobs',
 }
 
@@ -59,9 +61,16 @@ export function JobCard({ job, active }: { job: JobWithMeta; active?: boolean })
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-          {SOURCE_LABEL[job.source] ?? job.source}
-        </span>
+        {/* Uma badge por fonte onde a vaga apareceu. `sources` já vem
+            agregado na canônica, então não precisa de join aqui. */}
+        {(job.sources?.length ? job.sources : [job.source]).map((source) => (
+          <span
+            key={source}
+            className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+          >
+            {SOURCE_LABEL[source] ?? source}
+          </span>
+        ))}
         {posted ? (
           <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
             {posted}

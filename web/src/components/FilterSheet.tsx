@@ -5,6 +5,8 @@ const SENIORITIES = ['estagio', 'junior', 'pleno', 'senior', 'staff', 'lead']
 const WORK_MODELS = ['remoto', 'hibrido', 'presencial']
 const SOURCES = [
   { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'gupy', label: 'Gupy' },
+  { value: 'careerjet', label: 'Careerjet' },
   { value: 'google_jobs', label: 'Google Jobs' },
 ]
 const STATUSES = [

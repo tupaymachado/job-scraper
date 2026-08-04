@@ -1,5 +1,5 @@
 [Unit]
-Description=Job Scraper — LinkedIn a cada 6h
+Description=Job Scraper — coleta a cada 6h
 
 [Timer]
 OnCalendar=*-*-* 00,06,12,18:00:00

@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { SOURCE_LABEL } from '../components/JobCard'
 import { RequireAuth } from '../components/RequireAuth'
 import { useAuth } from '../lib/auth'
 import { useJob, useSetJobStatus } from '../lib/queries'
@@ -126,7 +127,7 @@ function JobDetail() {
           rel="noopener noreferrer"
           className="flex-1 rounded-lg bg-sky-600 px-4 py-2.5 text-center font-medium text-white hover:bg-sky-700"
         >
-          Candidatar-se
+          Candidatar-se{job.sources?.length > 1 ? ` (${SOURCE_LABEL[job.source] ?? job.source})` : ''}
         </a>
         {ACTIONS.map((action) => (
           <button
@@ -149,6 +150,25 @@ function JobDetail() {
           </button>
         ))}
       </div>
+
+      {job.alt_urls?.length ? (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-semibold">Também disponível em</h2>
+          <div className="flex flex-wrap gap-2">
+            {job.alt_urls.map((alt) => (
+              <a
+                key={alt.url}
+                href={alt.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:border-sky-500 hover:text-sky-600 dark:border-zinc-700"
+              >
+                {SOURCE_LABEL[alt.source] ?? alt.source} ↗
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="mt-6 mb-32 md:mb-6">
         <h2 className="mb-2 font-semibold">Descrição</h2>

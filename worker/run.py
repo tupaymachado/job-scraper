@@ -15,15 +15,38 @@ import logging
 import sys
 
 # Registra os conectores no REGISTRY (import por efeito colateral).
+import connectors.careerjet  # noqa: F401
 import connectors.google_jobs  # noqa: F401
+import connectors.gupy  # noqa: F401
 import connectors.linkedin  # noqa: F401
 from connectors.base import REGISTRY, get_connector
+from connectors.careerjet import MissingApiKey
 from models import SearchProfile, SourceBlocked
 from store import Store
 
 log = logging.getLogger("worker")
 
 DETAIL_SOURCES = {"linkedin"}  # fontes cujo conector tem fetch_detail()
+
+# Ordem de coleta = ordem de preferência no dedup: a primeira fonte a ver
+# uma vaga vira a canônica e é o link que o usuário abre.
+#
+# LinkedIn e Gupy primeiro porque têm URL direta para a vaga. A Careerjet
+# fica por último de propósito: o link dela é um redirect de tracking
+# opaco, então ela deve entrar como duplicata, somando cobertura sem
+# roubar o link bom de quem chegou antes.
+SOURCE_ORDER = ["linkedin", "gupy", "careerjet", "google_jobs"]
+
+# O que `--source all` roda. O google_jobs fica DE FORA porque o Google
+# flagra o IP após um acesso automatizado: ele tem timer próprio, 1x/dia.
+# Incluí-lo aqui faria a coleta de 6h em 6h queimar o IP e encher o
+# scrape_runs de 'blocked' sem colher nada.
+BULK_SOURCES = ["linkedin", "gupy", "careerjet"]
+
+
+def ordered_sources(sources: list[str]) -> list[str]:
+    known = [s for s in SOURCE_ORDER if s in sources]
+    return known + [s for s in sources if s not in SOURCE_ORDER]
 
 
 def scrape(store: Store, source: str, profile: SearchProfile, limit: int = 50) -> tuple[int, int]:
@@ -33,6 +56,11 @@ def scrape(store: Store, source: str, profile: SearchProfile, limit: int = 50) -
 
     try:
         jobs = connector.search(profile, limit=limit)
+    except MissingApiKey as exc:
+        # Sem credencial configurada: não é falha da coleta, é fonte desligada.
+        log.info("[%s] pulado: %s", source, exc)
+        store.finish_run(run_id, "blocked", error=str(exc))
+        return 0, 0
     except SourceBlocked as exc:
         log.warning("[%s] bloqueado: %s", source, exc)
         store.finish_run(run_id, "blocked", error=str(exc))
@@ -70,6 +98,15 @@ def scrape(store: Store, source: str, profile: SearchProfile, limit: int = 50) -
     return len(jobs), inserted
 
 
+def run_all(store: Store, limit: int) -> None:
+    """Roda as fontes HTTP na ordem de prioridade do dedup.
+
+    Não inclui google_jobs — ver BULK_SOURCES.
+    """
+    for source in BULK_SOURCES:
+        run_source(store, source, limit)
+
+
 def run_source(store: Store, source: str, limit: int) -> None:
     profiles = store.enabled_search_profiles()
     targets = [p for p in profiles if source in p.sources]
@@ -98,7 +135,7 @@ def drain_queue(store: Store, limit: int) -> None:
                 store.finish_scrape_request(request["id"], "error", "perfil de busca não encontrado")
                 continue
 
-            for source in profile.sources:
+            for source in ordered_sources(profile.sources):
                 if source in REGISTRY:
                     scrape(store, source, profile, limit=limit)
                 else:
@@ -112,7 +149,11 @@ def drain_queue(store: Store, limit: int) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Worker de scraping de vagas")
-    parser.add_argument("--source", choices=sorted(REGISTRY), help="fonte a rodar")
+    parser.add_argument(
+        "--source",
+        choices=[*sorted(REGISTRY), "all"],
+        help="fonte a rodar ('all' roda todas na ordem de prioridade do dedup)",
+    )
     parser.add_argument("--queue", action="store_true", help="drena scrape_requests e sai")
     parser.add_argument("--once", action="store_true", help="uma passada e sai")
     parser.add_argument("--limit", type=int, default=50, help="máximo de vagas por perfil")
@@ -132,6 +173,8 @@ def main() -> int:
 
     if args.queue:
         drain_queue(store, args.limit)
+    elif args.source == "all":
+        run_all(store, args.limit)
     else:
         run_source(store, args.source, args.limit)
 

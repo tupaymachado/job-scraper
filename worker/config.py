@@ -28,6 +28,10 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 OPENCODE_API_KEY = os.environ.get("OPENCODE_API_KEY", "")
 OPENCODE_BASE_URL = os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/v1")
 
+# Careerjet: opcional na prática (a API responde 200 sem), mas o termo de
+# uso pede um. Registre grátis em https://www.careerjet.com/partners/
+CAREERJET_AFFID = os.environ.get("CAREERJET_AFFID", "")
+
 # Modelo barato para extrair campos estruturados de muitas vagas.
 ENRICH_MODEL = os.environ.get("ENRICH_MODEL", "gemini-3.5-flash")
 # Modelo forte, só nas vagas que passam o prefiltro.

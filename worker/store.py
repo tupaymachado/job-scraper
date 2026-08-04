@@ -15,6 +15,7 @@ from typing import Any
 import requests
 
 from config import require_supabase
+from dedup import make_dedup_key
 from models import RawJob, SearchProfile
 
 log = logging.getLogger(__name__)
@@ -87,21 +88,146 @@ class Store:
     # -- escrita -----------------------------------------------------
 
     def upsert_jobs(self, jobs: list[RawJob]) -> int:
-        """Insere ignorando duplicatas. Retorna quantas linhas entraram."""
+        """Insere ignorando duplicatas e liga as duplicatas. Retorna as novas.
+
+        Dedup em duas camadas:
+          1. (source, source_job_id) unique — a mesma vaga, relida da mesma
+             fonte, não vira linha nova.
+          2. dedup_key (título+empresa normalizados) — a mesma vaga vista em
+             fontes diferentes, ou republicada pela mesma fonte com outro id.
+             A primeira vista vira canônica; as demais recebem canonical_id,
+             somem do feed e somam sua fonte/link na canônica.
+
+        A camada 2 vale também DENTRO da mesma fonte: o LinkedIn republica a
+        mesma vaga por cidade com source_job_id diferente (visto de verdade —
+        "React Engineer - Remote, Latin America" da Bluelight aparecendo em
+        Porto Alegre e Salvador). A unique da camada 1 não pega esse caso.
+
+        Inserimos em duas fases porque uma duplicata pode ter sua canônica no
+        MESMO lote: só depois do primeiro insert é que o id dela existe para
+        ser referenciado.
+        """
         if not jobs:
             return 0
 
-        inserted = self._request(
-            "POST",
-            "jobs",
-            params={"on_conflict": "source,source_job_id", "select": "id"},
-            headers={
-                # ignore-duplicates: uma vaga já vista não é sobrescrita.
-                "Prefer": "resolution=ignore-duplicates,return=representation",
-            },
-            json=[j.to_row() for j in jobs],
+        for job in jobs:
+            job.dedup_key = make_dedup_key(job.title, job.company)
+
+        canonicals = self._canonical_by_dedup_key([j.dedup_key for j in jobs if j.dedup_key])
+
+        first_wave: list[dict[str, Any]] = []
+        second_wave: list[dict[str, Any]] = []
+        claimed: set[str] = set()
+
+        for job in jobs:
+            row = job.to_row()
+            key = job.dedup_key or ""
+
+            if key in canonicals:
+                row["canonical_id"] = canonicals[key]["id"]
+                first_wave.append(row)
+            elif key in claimed:
+                # A canônica está neste mesmo lote e ainda não tem id.
+                second_wave.append(row)
+            else:
+                claimed.add(key)
+                row["sources"] = [job.source]
+                first_wave.append(row)
+
+        inserted = self._insert_rows(first_wave)
+
+        if second_wave:
+            # Agora as canônicas do lote existem: resolve e insere o resto.
+            resolved = self._canonical_by_dedup_key([r["dedup_key"] for r in second_wave])
+            for row in second_wave:
+                canonical = resolved.get(row["dedup_key"] or "")
+                if canonical:
+                    row["canonical_id"] = canonical["id"]
+                else:
+                    row["sources"] = [row["source"]]
+            inserted += self._insert_rows(second_wave)
+
+        return len(inserted)
+
+    def _insert_rows(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not rows:
+            return []
+        inserted = (
+            self._request(
+                "POST",
+                "jobs",
+                params={
+                    "on_conflict": "source,source_job_id",
+                    "select": "id,canonical_id,source,url",
+                },
+                headers={
+                    # ignore-duplicates: uma vaga já vista não é sobrescrita.
+                    "Prefer": "resolution=ignore-duplicates,return=representation",
+                },
+                json=rows,
+            )
+            or []
         )
-        return len(inserted or [])
+        self._attach_to_canonicals(inserted)
+        return inserted
+
+    def _canonical_by_dedup_key(self, dedup_keys: list[str]) -> dict[str, dict[str, Any]]:
+        """Canônicas já existentes para essas chaves (canonical_id is null)."""
+        found: dict[str, dict[str, Any]] = {}
+        unique_keys = list({k for k in dedup_keys if k})
+
+        for i in range(0, len(unique_keys), 50):
+            chunk = unique_keys[i : i + 50]
+            in_list = ",".join('"' + k.replace('"', '""') + '"' for k in chunk)
+            rows = self._request(
+                "GET",
+                "jobs",
+                params={
+                    "dedup_key": f"in.({in_list})",
+                    "canonical_id": "is.null",
+                    "select": "id,dedup_key,source",
+                },
+            )
+            for row in rows or []:
+                # Primeira vista vence: não sobrescreve uma canônica já achada.
+                found.setdefault(row["dedup_key"], row)
+        return found
+
+    def _attach_to_canonicals(self, inserted: list[dict[str, Any]]) -> None:
+        """Soma fonte e link das duplicatas recém-criadas na canônica.
+
+        Denormalizar aqui evita um embed auto-referencial no PostgREST só
+        para o card mostrar os badges de fonte.
+        """
+        by_canonical: dict[str, list[dict[str, Any]]] = {}
+        for row in inserted:
+            if row.get("canonical_id"):
+                by_canonical.setdefault(row["canonical_id"], []).append(row)
+
+        for canonical_id, duplicates in by_canonical.items():
+            current = self._request(
+                "GET", "jobs", params={"id": f"eq.{canonical_id}", "select": "sources,alt_urls"}
+            )
+            if not current:
+                continue
+
+            sources = list(current[0].get("sources") or [])
+            alt_urls = list(current[0].get("alt_urls") or [])
+            known = {entry.get("url") for entry in alt_urls}
+
+            for duplicate in duplicates:
+                if duplicate["source"] not in sources:
+                    sources.append(duplicate["source"])
+                if duplicate.get("url") and duplicate["url"] not in known:
+                    alt_urls.append({"source": duplicate["source"], "url": duplicate["url"]})
+                    known.add(duplicate["url"])
+
+            self._request(
+                "PATCH",
+                "jobs",
+                params={"id": f"eq.{canonical_id}"},
+                json={"sources": sources, "alt_urls": alt_urls},
+            )
 
     # -- scrape_runs -------------------------------------------------
 
@@ -184,6 +310,7 @@ class Store:
                 params={
                     "select": "id,title,company,location,description_text,raw,job_enrichments(job_id)",
                     "description_text": "not.is.null",
+                    "canonical_id": "is.null",
                     "job_enrichments": "is.null",
                     "order": "first_seen_at.desc",
                     "limit": str(limit),
