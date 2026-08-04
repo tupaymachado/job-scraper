@@ -78,6 +78,9 @@ some).
 
 ## Setup
 
+Passo a passo completo e na ordem certa: **[SETUP.md](SETUP.md)**.
+O resumo abaixo assume que você já sabe o que está fazendo.
+
 ### 1. Supabase
 
 Aplique as migrations do [supabase/migrations/](supabase/migrations/) **em ordem** no
