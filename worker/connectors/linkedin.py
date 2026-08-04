@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 
 from connectors.base import register
 from models import RawJob, SearchProfile, SourceBlocked
+from sanitize import sanitize_html
 
 log = logging.getLogger(__name__)
 
@@ -183,7 +184,9 @@ class LinkedInConnector:
 
         markup = soup.select_one("div.show-more-less-html__markup")
         if markup:
-            job.description_html = str(markup)
+            # Sanitiza ANTES de gravar: o front renderiza isso com
+            # dangerouslySetInnerHTML e o conteúdo é de terceiros.
+            job.description_html = sanitize_html(str(markup))
             job.description_text = markup.get_text("\n", strip=True)
 
         # O LinkedIn já entrega critérios estruturados — aproveitar antes da IA.
