@@ -1,0 +1,11 @@
+[Unit]
+Description=Job Scraper — LinkedIn a cada 6h
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+# Espalha o disparo para não bater sempre no mesmo minuto cheio.
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

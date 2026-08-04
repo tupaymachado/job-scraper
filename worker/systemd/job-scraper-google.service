@@ -1,0 +1,11 @@
+[Unit]
+Description=Job Scraper — coleta Google Jobs (best-effort)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/job-scraper/worker
+ExecStart=%h/botasaurus-env/bin/python run.py --source google_jobs --once
+Nice=10
+TimeoutStartSec=900

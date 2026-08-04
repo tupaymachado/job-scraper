@@ -1,0 +1,20 @@
+# segredos — service_role key e OPENCODE_API_KEY vivem só na VM
+.env
+*.env
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# node
+node_modules/
+.vercel/
+.output/
+.nitro/
+dist/
+
+# botasaurus
+worker/profiles/
+output/

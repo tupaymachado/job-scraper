@@ -1,0 +1,12 @@
+[Unit]
+Description=Job Scraper — Google Jobs 1x/dia
+
+[Timer]
+# 1x/dia: o Google flagra o IP após um acesso automatizado. Rodar mais
+# vezes só gera captcha — não aumentar a frequência.
+OnCalendar=*-*-* 07:30:00
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

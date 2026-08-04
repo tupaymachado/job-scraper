@@ -1,0 +1,11 @@
+[Unit]
+Description=Job Scraper — drena a fila de pedidos sob demanda
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/job-scraper/worker
+ExecStart=%h/botasaurus-env/bin/python run.py --queue
+Nice=5
+TimeoutStartSec=1800
