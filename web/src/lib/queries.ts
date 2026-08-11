@@ -50,9 +50,17 @@ export function useJobsFeed(filters: FeedFilters) {
     queryKey: ['jobs', filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
+      // Filtro em coluna de embed só corta o nível de cima com !inner. Sem
+      // ele o PostgREST devolve a vaga assim mesmo, só com o embed nulo —
+      // era por isso que uma vaga presencial aparecia sob o filtro "remoto".
+      // O !inner entra apenas quando há filtro de enrichment, senão sumiriam
+      // do feed as vagas ainda não enriquecidas.
+      const filtersEnrichment = Boolean(filters.seniority || filters.workModel)
+      const enrichmentEmbed = filtersEnrichment ? 'job_enrichments!inner(*)' : 'job_enrichments(*)'
+
       let query = getSupabase()
         .from('jobs_feed')
-        .select('*, job_enrichments(*), job_matches(*), job_status(*)')
+        .select(`*, ${enrichmentEmbed}, job_matches(*), job_status(*)`)
         // Só canônicas: as duplicatas cross-source viram badges na canônica.
         .is('canonical_id', null)
         // Descartada vai para o fim independente do score; dentro de cada
