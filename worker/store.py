@@ -123,6 +123,12 @@ class Store:
             row = job.to_row()
             key = job.dedup_key or ""
 
+            # Toda linha carrega as duas chaves, mesmo quando só uma é usada:
+            # o PostgREST exige key set idêntico em insert de lote (PGRST102) e
+            # um lote normalmente mistura canônicas com duplicatas.
+            row["canonical_id"] = None
+            row["sources"] = []
+
             if key in canonicals:
                 row["canonical_id"] = canonicals[key]["id"]
                 first_wave.append(row)
