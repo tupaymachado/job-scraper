@@ -34,7 +34,12 @@ export const emptyFilters: FeedFilters = {
 }
 
 /**
- * Feed paginado.
+ * Feed paginado, ordenado pelo score de aderência (maior primeiro).
+ *
+ * Lê de `jobs_feed` e não de `jobs`: a view expõe o score do usuário logado
+ * como coluna do nível de cima (ver 0003_feed_score.sql), o que o PostgREST
+ * não consegue ordenar a partir do embed job_matches. Vaga ainda sem score
+ * fica no fim, em vez de sumir do feed.
  *
  * job_matches e job_status são embeds por usuário — a RLS já limita ao
  * dono, então não precisamos filtrar por user_id na query.
@@ -45,11 +50,16 @@ export function useJobsFeed(filters: FeedFilters) {
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
       let query = getSupabase()
-        .from('jobs')
+        .from('jobs_feed')
         .select('*, job_enrichments(*), job_matches(*), job_status(*)')
         // Só canônicas: as duplicatas cross-source viram badges na canônica.
         .is('canonical_id', null)
+        .order('match_score', { ascending: false, nullsFirst: false })
+        // Desempate obrigatório, não cosmético: muita vaga empata em score
+        // (o prefiltro zera em lote) e o range da paginação precisa de ordem
+        // total, senão a mesma vaga aparece em duas páginas.
         .order('first_seen_at', { ascending: false })
+        .order('id', { ascending: true })
         .range(pageParam, pageParam + PAGE_SIZE - 1)
 
       if (filters.search) {
@@ -62,17 +72,18 @@ export function useJobsFeed(filters: FeedFilters) {
       if (filters.source) query = query.contains('sources', [filters.source])
       if (filters.seniority) query = query.eq('job_enrichments.seniority', filters.seniority)
       if (filters.workModel) query = query.eq('job_enrichments.work_model', filters.workModel)
+      // Agora que o score é coluna, o corte é do banco: filtrar depois da
+      // paginação devolvia página curta (ou vazia) com "Carregar mais" ativo.
+      // Vaga sem score sai junto, que é o que o filtro no cliente já fazia.
+      if (filters.minScore > 0) query = query.gte('match_score', filters.minScore)
 
       const { data, error } = await query
       if (error) throw error
 
       let jobs = (data ?? []) as unknown as JobWithMeta[]
 
-      // Score e status ficam em embeds — o PostgREST não filtra por eles
-      // sem !inner, e !inner esconderia vagas ainda não pontuadas.
-      if (filters.minScore > 0) {
-        jobs = jobs.filter((j) => (j.job_matches?.[0]?.score ?? 0) >= filters.minScore)
-      }
+      // Status continua no cliente: é embed, e o !inner que o PostgREST
+      // exigiria para filtrar por ele esconderia vaga sem linha em job_status.
       if (filters.status !== 'all') {
         jobs = jobs.filter((j) => (j.job_status?.[0]?.status ?? 'new') === filters.status)
       }

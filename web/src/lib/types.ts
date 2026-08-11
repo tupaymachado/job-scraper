@@ -56,6 +56,12 @@ export interface JobStatus {
 
 /** Vaga com os joins que o feed usa. O PostgREST devolve os embeds como array. */
 export interface JobWithMeta extends Job {
+  /**
+   * Score do usuário logado, achatado pela view `jobs_feed` para o feed
+   * poder ordenar/filtrar por ele. Ausente em quem lê direto de `jobs`
+   * (a página de detalhe), null enquanto a vaga não foi pontuada.
+   */
+  match_score?: number | null
   job_enrichments: JobEnrichment | JobEnrichment[] | null
   job_matches: JobMatch[] | null
   job_status: JobStatus[] | null
