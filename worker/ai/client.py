@@ -32,15 +32,27 @@ def chat(
     temperature: float = 0.0,
     max_tokens: int = 2000,
     retries: int = 3,
+    reasoning_effort: str | None = None,
 ) -> str:
+    """`reasoning_effort="none"` desliga o raciocínio do modelo.
+
+    Vale a pena onde a tarefa é extração mecânica: os modelos de reasoning
+    gastam o orçamento de `max_tokens` pensando ANTES de emitir `content`, e
+    estourar o limite devolve content vazio — não erro. Medido em glm-5.2
+    com uma vaga real: 514 tokens com raciocínio contra 83 sem, mesma saída.
+
+    Só é enviado quando pedido: nem todo modelo aceita o parâmetro.
+    """
     key = require_opencode()
     url = f"{OPENCODE_BASE_URL.rstrip('/')}/chat/completions"
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if reasoning_effort is not None:
+        payload["reasoning_effort"] = reasoning_effort
 
     last_error: Exception | None = None
     for attempt in range(retries):

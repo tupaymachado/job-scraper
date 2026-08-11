@@ -101,7 +101,10 @@ def score_job(
             {"role": "user", "content": _prompt(job, cv_text, preferences)},
         ],
         model=model,
-        max_tokens=400,
+        # Aqui o raciocínio fica ligado: pontuar CV contra vaga é julgamento,
+        # não extração. Mas então o orçamento tem que caber raciocínio +
+        # resposta — com 400 o modelo pensava até o limite e devolvia vazio.
+        max_tokens=2000,
     )
     if data is None:
         return None

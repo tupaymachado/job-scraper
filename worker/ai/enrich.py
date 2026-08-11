@@ -96,6 +96,8 @@ def enrich_job(store: Store, job: dict[str, Any], model: str) -> bool:
         [{"role": "system", "content": SYSTEM}, {"role": "user", "content": _prompt(job)}],
         model=model,
         max_tokens=800,
+        # Extração mecânica de campos: raciocinar aqui só queima orçamento.
+        reasoning_effort="none",
     )
     if data is None:
         log.warning("vaga %s: modelo não devolveu JSON válido", job["id"])
