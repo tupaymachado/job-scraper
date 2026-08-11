@@ -168,7 +168,13 @@ class LinkedInConnector:
 
         Falha de detalhe não derruba a vaga: ela entra sem descrição e a
         IA simplesmente tem menos com o que trabalhar.
+
+        O `_sleep()` vale aqui tanto quanto na paginação: sem ele o loop de
+        detalhes dispara dezenas de requests seguidos e o LinkedIn devolve
+        429 na 1ª ou 2ª vaga. Medido com 6 vagas: 6/6 descrições com pausa,
+        bloqueio quase imediato sem.
         """
+        _sleep()
         try:
             resp = self.session.get(DETAIL_URL.format(job_id=job.source_job_id), timeout=30)
             if resp.status_code == 429:
