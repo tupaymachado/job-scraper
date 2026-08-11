@@ -33,9 +33,14 @@ OPENCODE_BASE_URL = os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen
 CAREERJET_AFFID = os.environ.get("CAREERJET_AFFID", "")
 
 # Modelo barato para extrair campos estruturados de muitas vagas.
-ENRICH_MODEL = os.environ.get("ENRICH_MODEL", "gemini-3.5-flash")
+ENRICH_MODEL = os.environ.get("ENRICH_MODEL", "glm-5.2")
 # Modelo forte, só nas vagas que passam o prefiltro.
-MATCH_MODEL = os.environ.get("MATCH_MODEL", "claude-sonnet-5")
+MATCH_MODEL = os.environ.get("MATCH_MODEL", "glm-5.2")
+
+# Usuário padrão do ai.match, para o timer poder rodar sem argumento.
+# Vive no .env, e não no unit do systemd, porque o id é pessoal e o repo
+# é público. O --user-id da linha de comando continua tendo precedência.
+MATCH_USER_ID = os.environ.get("MATCH_USER_ID", "")
 
 
 def require_supabase() -> tuple[str, str]:

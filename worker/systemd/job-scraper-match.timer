@@ -1,0 +1,12 @@
+[Unit]
+Description=Job Scraper — score a cada 2h
+
+[Timer]
+# 30 min depois do enrich (que roda em 00/2:40): pontuar depende dos campos
+# que o enrich extrai, então correr junto pegaria vaga ainda sem stack.
+OnCalendar=*-*-* 01/2:10:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

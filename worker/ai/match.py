@@ -3,7 +3,7 @@
 Duas etapas de propósito:
   1. Prefiltro barato (overlap de stack/keywords) — descarta o obviamente
      irrelevante sem gastar token.
-  2. Modelo forte (claude-sonnet-5) só no que passou.
+  2. Modelo forte (MATCH_MODEL) só no que passou.
 
 Sem o prefiltro, pagaríamos reasoning caro em vaga de Java para um perfil
 de front-end.
@@ -17,7 +17,7 @@ import re
 from typing import Any
 
 from ai.client import chat_json
-from config import MATCH_MODEL
+from config import MATCH_MODEL, MATCH_USER_ID
 from store import Store
 
 log = logging.getLogger(__name__)
@@ -122,10 +122,13 @@ def score_job(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Calcula score de aderência das vagas")
-    parser.add_argument("--user-id", required=True)
+    parser.add_argument("--user-id", default=MATCH_USER_ID)
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--model", default=MATCH_MODEL)
     args = parser.parse_args()
+
+    if not args.user_id:
+        parser.error("informe --user-id ou defina MATCH_USER_ID em worker/.env")
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
 

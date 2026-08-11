@@ -1,0 +1,13 @@
+[Unit]
+Description=Job Scraper — score das vagas contra o CV
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/job-scraper/worker
+# Sem --user-id: vem de MATCH_USER_ID no worker/.env. O id é pessoal e
+# este arquivo é versionado num repo público.
+ExecStart=%h/botasaurus-env/bin/python -m ai.match --limit 50
+Nice=10
+TimeoutStartSec=1800
