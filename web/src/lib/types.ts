@@ -62,6 +62,8 @@ export interface JobWithMeta extends Job {
    * (a página de detalhe), null enquanto a vaga não foi pontuada.
    */
   match_score?: number | null
+  /** Também achatado pela view: manda a vaga descartada para o fim do feed. */
+  is_discarded?: boolean
   job_enrichments: JobEnrichment | JobEnrichment[] | null
   job_matches: JobMatch[] | null
   job_status: JobStatus[] | null

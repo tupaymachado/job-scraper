@@ -34,7 +34,8 @@ export const emptyFilters: FeedFilters = {
 }
 
 /**
- * Feed paginado, ordenado pelo score de aderência (maior primeiro).
+ * Feed paginado: descartadas por último, e dentro de cada grupo o score de
+ * aderência (maior primeiro).
  *
  * Lê de `jobs_feed` e não de `jobs`: a view expõe o score do usuário logado
  * como coluna do nível de cima (ver 0003_feed_score.sql), o que o PostgREST
@@ -54,6 +55,9 @@ export function useJobsFeed(filters: FeedFilters) {
         .select('*, job_enrichments(*), job_matches(*), job_status(*)')
         // Só canônicas: as duplicatas cross-source viram badges na canônica.
         .is('canonical_id', null)
+        // Descartada vai para o fim independente do score; dentro de cada
+        // grupo vale a ordenação normal. false ordena antes de true.
+        .order('is_discarded', { ascending: true })
         .order('match_score', { ascending: false, nullsFirst: false })
         // Desempate obrigatório, não cosmético: muita vaga empata em score
         // (o prefiltro zera em lote) e o range da paginação precisa de ordem
