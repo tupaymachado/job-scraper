@@ -1,6 +1,6 @@
 /** Espelha supabase/migrations/0001_init.sql. */
 
-export type JobSource = 'linkedin' | 'gupy' | 'careerjet' | 'google_jobs'
+export type JobSource = 'linkedin' | 'gupy' | 'programathor' | 'careerjet' | 'google_jobs'
 
 export type Seniority = 'estagio' | 'junior' | 'pleno' | 'senior' | 'staff' | 'lead'
 export type WorkModel = 'remoto' | 'hibrido' | 'presencial'

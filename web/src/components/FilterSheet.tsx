@@ -6,6 +6,7 @@ const WORK_MODELS = ['remoto', 'hibrido', 'presencial']
 const SOURCES = [
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'gupy', label: 'Gupy' },
+  { value: 'programathor', label: 'Programathor' },
   { value: 'careerjet', label: 'Careerjet' },
   { value: 'google_jobs', label: 'Google Jobs' },
 ]
@@ -150,6 +151,22 @@ export function FilterPanel({ filters, onChange, onClose }: Props) {
           onChange={(e) => set('minScore', Number(e.target.value))}
           className="w-full accent-sky-500"
         />
+      </section>
+
+      <section>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Ordenação
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {(['score', 'time'] as const).map((s) => (
+            <Chip
+              key={s}
+              label={s === 'score' ? 'Score' : 'Tempo'}
+              active={filters.sort === s}
+              onClick={() => set('sort', s)}
+            />
+          ))}
+        </div>
       </section>
     </div>
   )

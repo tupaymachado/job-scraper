@@ -19,6 +19,7 @@ import connectors.careerjet  # noqa: F401
 import connectors.google_jobs  # noqa: F401
 import connectors.gupy  # noqa: F401
 import connectors.linkedin  # noqa: F401
+import connectors.programathor  # noqa: F401
 from connectors.base import REGISTRY, get_connector
 from connectors.careerjet import MissingApiKey
 from models import SearchProfile, SourceBlocked
@@ -26,7 +27,7 @@ from store import Store
 
 log = logging.getLogger("worker")
 
-DETAIL_SOURCES = {"linkedin"}  # fontes cujo conector tem fetch_detail()
+DETAIL_SOURCES = {"linkedin", "programathor"}  # fontes cujo conector tem fetch_detail()
 
 # Ordem de coleta = ordem de preferência no dedup: a primeira fonte a ver
 # uma vaga vira a canônica e é o link que o usuário abre.
@@ -35,13 +36,13 @@ DETAIL_SOURCES = {"linkedin"}  # fontes cujo conector tem fetch_detail()
 # fica por último de propósito: o link dela é um redirect de tracking
 # opaco, então ela deve entrar como duplicata, somando cobertura sem
 # roubar o link bom de quem chegou antes.
-SOURCE_ORDER = ["linkedin", "gupy", "careerjet", "google_jobs"]
+SOURCE_ORDER = ["linkedin", "gupy", "programathor", "careerjet", "google_jobs"]
 
 # O que `--source all` roda. O google_jobs fica DE FORA porque o Google
 # flagra o IP após um acesso automatizado: ele tem timer próprio, 1x/dia.
 # Incluí-lo aqui faria a coleta de 6h em 6h queimar o IP e encher o
 # scrape_runs de 'blocked' sem colher nada.
-BULK_SOURCES = ["linkedin", "gupy", "careerjet"]
+BULK_SOURCES = ["linkedin", "gupy", "programathor", "careerjet"]
 
 
 def ordered_sources(sources: list[str]) -> list[str]:

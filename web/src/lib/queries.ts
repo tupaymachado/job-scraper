@@ -22,6 +22,7 @@ export interface FeedFilters {
   workModel: string | null
   minScore: number
   status: JobStatusValue | 'all'
+  sort: 'score' | 'time'
 }
 
 export const emptyFilters: FeedFilters = {
@@ -31,6 +32,7 @@ export const emptyFilters: FeedFilters = {
   workModel: null,
   minScore: 0,
   status: 'all',
+  sort: 'score',
 }
 
 /**
@@ -66,11 +68,24 @@ export function useJobsFeed(filters: FeedFilters) {
         // Descartada vai para o fim independente do score; dentro de cada
         // grupo vale a ordenação normal. false ordena antes de true.
         .order('is_discarded', { ascending: true })
-        .order('match_score', { ascending: false, nullsFirst: false })
-        // Desempate obrigatório, não cosmético: muita vaga empata em score
-        // (o prefiltro zera em lote) e o range da paginação precisa de ordem
-        // total, senão a mesma vaga aparece em duas páginas.
-        .order('first_seen_at', { ascending: false })
+
+      // Ordenação principal
+      if (filters.sort === 'time') {
+        // Por tempo: mais recentes primeiro (first_seen_at desc)
+        query = query
+          .order('first_seen_at', { ascending: false })
+          .order('match_score', { ascending: false, nullsFirst: false })
+      } else {
+        // Por score (padrão): score desc, depois first_seen_at desc como tiebreaker
+        query = query
+          .order('match_score', { ascending: false, nullsFirst: false })
+          .order('first_seen_at', { ascending: false })
+      }
+
+      // Desempate obrigatório, não cosmético: muita vaga empata em score
+      // (o prefiltro zera em lote) e o range da paginação precisa de ordem
+      // total, senão a mesma vaga aparece em duas páginas.
+      query = query
         .order('id', { ascending: true })
         .range(pageParam, pageParam + PAGE_SIZE - 1)
 

@@ -5,6 +5,7 @@ import type { JobWithMeta } from '../lib/types'
 export const SOURCE_LABEL: Record<string, string> = {
   linkedin: 'LinkedIn',
   gupy: 'Gupy',
+  programathor: 'Programathor',
   careerjet: 'Careerjet',
   google_jobs: 'Google Jobs',
 }
