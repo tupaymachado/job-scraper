@@ -123,7 +123,7 @@ Todos os comandos do worker rodam a partir de `worker/`, com o venv do projeto:
           job-scraper-queue.timer \
           job-scraper-enrich.timer \
           job-scraper-match.timer \
-          job-scraper-google.timer
+          job-scraper-browser.timer
       ```
 - [ ] `systemctl --user list-timers` — os 5 devem aparecer com próximo disparo
 - [ ] Testar um serviço na mão e ver o log:
@@ -138,9 +138,12 @@ Todos os comandos do worker rodam a partir de `worker/`, com o venv do projeto:
 | `queue` | 60s | atende o botão "Buscar agora" do app |
 | `enrich` | 2/2h | extrai campos estruturados com IA |
 | `match` | 2/2h (30 min após o enrich) | score contra o CV de `MATCH_USER_ID` |
-| `google` | 1x/dia | Google Jobs, best-effort |
+| `browser` | 1x/dia | Selecty (Harmona, InCompany) + Google Jobs, via Chromium |
 
-> `job-scraper-google` vindo `blocked` é o **comportamento esperado**, não falha.
+> `job-scraper-browser` vindo `blocked` é o **comportamento esperado**, não falha:
+> o Google flagra o IP e a Selecty dá 403 para IP de datacenter.
+> As fontes de browser precisam de `worker/requirements-browser.txt` e de um Chrome
+> (`CHROME_PATH`, ou o Chromium do Playwright em `~/.cache/ms-playwright`).
 > O timer `match` lê o user id de `MATCH_USER_ID` no `worker/.env` — sem ele o
 > serviço sai com erro. O id fica fora do unit porque o repo é público.
 
@@ -171,7 +174,7 @@ Todos os comandos do worker rodam a partir de `worker/`, com o venv do projeto:
 - [ ] Salvar / Candidatei / Descartar persistem ao recarregar
 - [ ] `systemctl --user list-timers` mostra os 5 timers ativos
 - [ ] `select status, count(*) from scrape_runs group by status;` — a maioria `ok`,
-      `blocked` só em `google_jobs`
+      `blocked` só nas fontes de browser (`google_jobs`, `harmona`, `incompany`)
 
 ## Quando algo falhar
 

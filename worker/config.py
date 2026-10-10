@@ -43,6 +43,21 @@ MATCH_MODEL = os.environ.get("MATCH_MODEL", "glm-5.2")
 MATCH_USER_ID = os.environ.get("MATCH_USER_ID", "")
 
 
+# Conectores com browser (Botasaurus). Sem Chrome no sistema, cai no
+# Chromium que o Playwright baixa em ~/.cache/ms-playwright (é o caso desta VM,
+# ARM64, onde não há pacote google-chrome). None = deixa o Botasaurus procurar.
+CHROME_PATH = os.environ.get("CHROME_PATH", "")
+
+
+def chrome_path() -> str | None:
+    if CHROME_PATH:
+        return CHROME_PATH
+    candidates = sorted(
+        Path.home().glob(".cache/ms-playwright/chromium-*/chrome-linux*/chrome"), reverse=True
+    )
+    return str(candidates[0]) if candidates else None
+
+
 def require_supabase() -> tuple[str, str]:
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise SystemExit(

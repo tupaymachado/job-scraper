@@ -5,12 +5,13 @@
 -- worker/.env antes de rodar no SQL Editor. Idempotente: pula perfis que o
 -- usuário já tem com o mesmo nome.
 --
--- Fontes: gupy, linkedin, careerjet, amplagestao. Programathor fica de fora (só TI).
+-- Fontes: gupy, linkedin, careerjet, amplagestao, harmona, incompany.
+-- Programathor fica de fora (só TI).
 -- remote_only = false: o conector da Gupy traz as de Pelotas + as remotas.
 
 insert into search_profiles (user_id, name, keywords, location, remote_only, sources, enabled)
 select '<MATCH_USER_ID>'::uuid, v.name, v.keywords, 'Pelotas, RS', false,
-       '{gupy,linkedin,amplagestao,careerjet}'::text[], true
+       '{gupy,linkedin,amplagestao,harmona,incompany,careerjet}'::text[], true
 from (values
   ('Administrativo Pelotas', 'administrativo'),
   ('Financeiro Pelotas',     'financeiro'),
@@ -27,3 +28,10 @@ set sources = array_append(sources, 'amplagestao')
 where user_id = '<MATCH_USER_ID>'::uuid
   and name in ('Administrativo Pelotas', 'Financeiro Pelotas', 'Contábil Pelotas')
   and not ('amplagestao' = any(sources));
+
+-- Idem para os portais Selecty (harmona, incompany).
+update search_profiles
+set sources = sources || array['harmona', 'incompany']
+where user_id = '<MATCH_USER_ID>'::uuid
+  and name in ('Administrativo Pelotas', 'Financeiro Pelotas', 'Contábil Pelotas')
+  and not ('harmona' = any(sources));

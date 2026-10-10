@@ -8,6 +8,8 @@ const SOURCES = [
   { value: 'gupy', label: 'Gupy' },
   { value: 'programathor', label: 'Programathor' },
   { value: 'amplagestao', label: 'Ampla Gestão' },
+  { value: 'harmona', label: 'Harmona' },
+  { value: 'incompany', label: 'InCompany' },
   { value: 'careerjet', label: 'Careerjet' },
   { value: 'google_jobs', label: 'Google Jobs' },
 ]

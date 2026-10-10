@@ -1,6 +1,7 @@
 # Job Scraper
 
-Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Ampla Gestão, Careerjet e Google Jobs, enriquece com IA
+Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Ampla Gestão, Careerjet, portais Selecty
+(Harmona, InCompany) e Google Jobs, enriquece com IA
 (campos estruturados + score de aderência ao seu perfil) e mostra tudo num feed.
 
 ```
@@ -12,6 +13,7 @@ VM Oracle (worker Python)                    Vercel (TanStack Start)
 │  ├ programathor (HTTP)     │                          │
 │  ├ amplagestao  (HTTP)     │                          │
 │  ├ careerjet.py (HTTP)     │                          │
+│  ├ selecty.py   (Bota)     │                          │
 │  ├ google_jobs.py (Bota)   │                          │
 │  ├ ai/enrich.py (Zen)      │                          │ RLS
 │  └ ai/match.py  (Zen)      │                          │
@@ -39,6 +41,7 @@ Medido nesta VM em ago/2026, para o termo "desenvolvedor":
 | **Gupy** | API JSON pública, sem auth | **554** por termo, 100/página | Melhor estruturada: modalidade, skills, URL direta |
 | **Programathor** | HTML server-side + JSON-LD | 15/página | Só TI; senioridade, contrato e salário declarados pelo anunciante |
 | **Ampla Gestão** | HTML server-side (LinkVagas) + JSON-LD | ~20 no portal, sem busca | Consultoria de RH de Pelotas; keywords e cidade filtradas por nós |
+| **Harmona / InCompany** | Portais Selecty, Botasaurus, 1x/dia | — | **403 para IP de datacenter** (nginx, sem challenge): hoje sempre `blocked`. Ver TODO em `worker/connectors/selecty.py` |
 | **Careerjet** | API v4, Basic auth | 1917 hits, 99/página | Agregadora, ~39% com salário. **Exige API key grátis** |
 | **Google Jobs** | Botasaurus | ~10/dia, quase sempre bloqueado | Best-effort |
 
@@ -119,7 +122,7 @@ loginctl enable-linger ubuntu                    # sobrevive a logout
 mkdir -p ~/.config/systemd/user
 cp worker/systemd/* ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now job-scraper-collect.timer job-scraper-google.timer \
+systemctl --user enable --now job-scraper-collect.timer job-scraper-browser.timer \
     job-scraper-queue.timer job-scraper-enrich.timer job-scraper-match.timer
 systemctl --user list-timers
 ```
@@ -144,7 +147,8 @@ Deploy: push para o Git e importar na Vercel. Ela detecta TanStack Start e o
 ```bash
 python run.py --source all --once          # LinkedIn, Gupy, Programathor, Ampla, Careerjet (ordem do dedup)
 python run.py --source gupy --once         # uma fonte só
-python run.py --source google_jobs --once  # best-effort, fora do 'all' de propósito
+python run.py --source browser --once      # Selecty + Google Jobs (Chromium), 1x/dia, fora do 'all'
+python run.py --source google_jobs --once  # uma fonte de browser só
 python run.py --queue                      # drena os pedidos do botão "Buscar agora"
 python -m ai.enrich --limit 20             # extrai campos estruturados
 python -m ai.match                         # score de aderência (MATCH_USER_ID do .env, ou --user-id)
@@ -163,8 +167,10 @@ de cada consumidor lembrar de sanitizar.
 stack antes de chamar o modelo. Sem ele, pagaríamos reasoning caro para descobrir
 que uma vaga de COBOL não combina com um perfil de front-end.
 
-**`--source all` não inclui o Google Jobs.** Ele tem timer próprio, 1x/dia. Rodá-lo
-junto da coleta de 6/6h só queimaria o IP e encheria `scrape_runs` de `blocked`.
+**`--source all` não inclui as fontes de browser.** Google Jobs e Selecty têm timer
+próprio (`job-scraper-browser`, 1x/dia) e também ficam de fora do botão "Buscar
+agora". Rodá-las a cada 6h ou a cada clique só queimaria o IP e encheria
+`scrape_runs` de `blocked`.
 
 **Detalhe só do que é novo.** O request de descrição do LinkedIn é o mais caro do
 orçamento de rate limit, então `run.py` consulta os IDs já conhecidos antes.

@@ -164,6 +164,8 @@ class GoogleJobsConnector:
         # em `import` quando só o LinkedIn vai rodar.
         from botasaurus.browser import browser
 
+        from config import chrome_path
+
         query = f"{profile.keywords} vagas"
         if profile.location:
             query += f" {profile.location}"
@@ -176,6 +178,7 @@ class GoogleJobsConnector:
             close_on_crash=True,
             tiny_profile=True,
             profile="job-scraper-gjobs",  # obrigatório junto com tiny_profile
+            chrome_executable_path=chrome_path(),
         )
         def _scrape(driver, _data):
             driver.delete_cookies_and_local_storage()

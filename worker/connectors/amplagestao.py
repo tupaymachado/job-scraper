@@ -38,7 +38,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from connectors.base import register
-from location import fold, parse_location, same_place
+from location import fold, matches_keywords, parse_location, same_place
 from models import RawJob, SearchProfile, SourceBlocked
 from sanitize import html_to_text, sanitize_html
 
@@ -66,10 +66,6 @@ CONTRACT_MAP = {"clt": "clt", "estagio": "estagio", "autonomo - pj": "pj", "pj":
 def _sleep() -> None:
     """1,5–2,5s entre requests: portal pequeno, sem CDN — é sobre não pesar nele."""
     time.sleep(random.uniform(1.5, 2.5))
-
-
-def _keyword_tokens(keywords: str) -> list[str]:
-    return [t for t in re.split(r"\W+", fold(keywords)) if len(t) >= 3]
 
 
 def _split_city(text: str | None) -> tuple[str | None, str | None]:
@@ -121,13 +117,12 @@ class AmplaGestaoConnector:
             # layout do que "zero vagas abertas" numa consultoria ativa.
             log.warning("Ampla Gestão: nenhuma div.lv-job-row — layout pode ter mudado")
 
-        tokens = _keyword_tokens(profile.keywords)
         city, state = parse_location(profile.location)
 
         jobs: list[RawJob] = []
         for job in all_jobs:
             haystack = fold(job.raw.get("search_text"))
-            if tokens and not any(t in haystack for t in tokens):
+            if not matches_keywords(profile.keywords, haystack):
                 continue
             if profile.remote_only:
                 if not any(w in haystack for w in REMOTE_WORDS):

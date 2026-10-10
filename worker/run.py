@@ -3,6 +3,7 @@
     python run.py --source linkedin --once      # roda os perfis habilitados
     python run.py --queue                       # drena scrape_requests
     python run.py --source google_jobs --once   # best-effort, pode vir 'blocked'
+    python run.py --source browser --once       # todas as fontes com browser (1x/dia)
 
 Bloqueio (429/captcha) é resultado esperado, não falha: vira
 scrape_runs.status='blocked' e o processo sai com 0.
@@ -21,6 +22,7 @@ import connectors.google_jobs  # noqa: F401
 import connectors.gupy  # noqa: F401
 import connectors.linkedin  # noqa: F401
 import connectors.programathor  # noqa: F401
+import connectors.selecty  # noqa: F401
 from connectors.base import REGISTRY, get_connector
 from connectors.careerjet import MissingApiKey
 from models import SearchProfile, SourceBlocked
@@ -37,13 +39,21 @@ DETAIL_SOURCES = {"linkedin", "programathor", "amplagestao"}  # fontes cujo cone
 # fica por último de propósito: o link dela é um redirect de tracking
 # opaco, então ela deve entrar como duplicata, somando cobertura sem
 # roubar o link bom de quem chegou antes.
-SOURCE_ORDER = ["linkedin", "gupy", "programathor", "amplagestao", "careerjet", "google_jobs"]
+SOURCE_ORDER = [
+    "linkedin", "gupy", "programathor", "amplagestao", "harmona", "incompany",
+    "careerjet", "google_jobs",
+]
 
 # O que `--source all` roda. O google_jobs fica DE FORA porque o Google
 # flagra o IP após um acesso automatizado: ele tem timer próprio, 1x/dia.
 # Incluí-lo aqui faria a coleta de 6h em 6h queimar o IP e encher o
 # scrape_runs de 'blocked' sem colher nada.
 BULK_SOURCES = ["linkedin", "gupy", "programathor", "amplagestao", "careerjet"]
+
+# O que `--source browser` roda, 1x/dia (timer job-scraper-browser): fontes
+# que sobem Chromium via Botasaurus. Caras, e bloqueio é o resultado normal —
+# Google flagra o IP; a Selecty (harmona, incompany) dá 403 para datacenter.
+BROWSER_SOURCES = ["harmona", "incompany", "google_jobs"]
 
 
 def ordered_sources(sources: list[str]) -> list[str]:
@@ -100,12 +110,12 @@ def scrape(store: Store, source: str, profile: SearchProfile, limit: int = 50) -
     return len(jobs), inserted
 
 
-def run_all(store: Store, limit: int) -> None:
-    """Roda as fontes HTTP na ordem de prioridade do dedup.
+def run_all(store: Store, limit: int, sources: list[str] = BULK_SOURCES) -> None:
+    """Roda um grupo de fontes na ordem de prioridade do dedup.
 
-    Não inclui google_jobs — ver BULK_SOURCES.
+    O padrão são as fontes HTTP; as de browser têm grupo próprio.
     """
-    for source in BULK_SOURCES:
+    for source in sources:
         run_source(store, source, limit)
 
 
@@ -138,7 +148,11 @@ def drain_queue(store: Store, limit: int) -> None:
                 continue
 
             for source in ordered_sources(profile.sources):
-                if source in REGISTRY:
+                if source in BROWSER_SOURCES:
+                    # Ficam no timer de 1x/dia: rodar a cada clique só queimaria
+                    # o IP no Google e colecionaria 403 da Selecty.
+                    log.info("fonte %r pulada no pedido sob demanda (só 1x/dia)", source)
+                elif source in REGISTRY:
                     scrape(store, source, profile, limit=limit)
                 else:
                     log.warning("fonte desconhecida no perfil: %r", source)
@@ -153,8 +167,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Worker de scraping de vagas")
     parser.add_argument(
         "--source",
-        choices=[*sorted(REGISTRY), "all"],
-        help="fonte a rodar ('all' roda todas na ordem de prioridade do dedup)",
+        choices=[*sorted(REGISTRY), "all", "browser"],
+        help="fonte a rodar ('all' = fontes HTTP, 'browser' = fontes com Chromium)",
     )
     parser.add_argument("--queue", action="store_true", help="drena scrape_requests e sai")
     parser.add_argument("--once", action="store_true", help="uma passada e sai")
@@ -177,6 +191,8 @@ def main() -> int:
         drain_queue(store, args.limit)
     elif args.source == "all":
         run_all(store, args.limit)
+    elif args.source == "browser":
+        run_all(store, args.limit, BROWSER_SOURCES)
     else:
         run_source(store, args.source, args.limit)
 

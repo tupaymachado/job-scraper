@@ -1,7 +1,8 @@
-"""Localização dos perfis de busca, compartilhada entre os conectores.
+"""Filtros de perfil de busca (local e palavras-chave), compartilhados entre conectores.
 
 O perfil guarda texto livre ("Pelotas, RS", "Brazil"). Fontes que não
-filtram por local no servidor (ou filtram mal) usam isto para pós-filtrar.
+filtram por local ou termo no servidor (ou filtram mal) usam isto para
+pós-filtrar.
 """
 
 from __future__ import annotations
@@ -61,3 +62,19 @@ def same_place(city: str | None, state: str | None, want_city: str, want_state: 
         return True
     state_name = UF_NAMES.get(state.strip().upper(), state)
     return fold(state_name) == fold(want_state)
+
+
+def keyword_tokens(keywords: str | None) -> list[str]:
+    """Palavras do perfil com 3+ letras, sem acento: 'Contábil e fiscal' -> ['contabil', 'fiscal']."""
+    return [t for t in re.split(r"\W+", fold(keywords)) if len(t) >= 3]
+
+
+def matches_keywords(keywords: str | None, text: str | None) -> bool:
+    """Para fontes sem busca no servidor: QUALQUER palavra do perfil no texto basta.
+
+    OR e não AND de propósito: um perfil "administrativo financeiro fiscal"
+    quer as três áreas. Perfil sem palavra útil não filtra nada.
+    """
+    tokens = keyword_tokens(keywords)
+    haystack = fold(text)
+    return not tokens or any(t in haystack for t in tokens)
