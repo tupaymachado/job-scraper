@@ -7,6 +7,7 @@ const SOURCES = [
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'gupy', label: 'Gupy' },
   { value: 'programathor', label: 'Programathor' },
+  { value: 'amplagestao', label: 'Ampla Gestão' },
   { value: 'careerjet', label: 'Careerjet' },
   { value: 'google_jobs', label: 'Google Jobs' },
 ]

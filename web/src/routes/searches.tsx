@@ -24,6 +24,7 @@ const ALL_SOURCES: { value: JobSource; label: string; hint: string }[] = [
   { value: 'linkedin', label: 'LinkedIn', hint: '~50 vagas por rodada, descrição completa' },
   { value: 'gupy', label: 'Gupy', hint: 'ATS dominante no Brasil, ~500 vagas por termo' },
   { value: 'programathor', label: 'Programathor', hint: 'Só vagas de TI, com senioridade e contrato declarados' },
+  { value: 'amplagestao', label: 'Ampla Gestão', hint: 'Consultoria de RH de Pelotas, ~20 vagas da região sul do RS' },
   { value: 'careerjet', label: 'Careerjet', hint: 'Agregadora, com salário. Exige API key grátis' },
   { value: 'google_jobs', label: 'Google Jobs', hint: '~10 vagas/dia, quase sempre bloqueado' },
 ]

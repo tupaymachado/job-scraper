@@ -6,6 +6,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   linkedin: 'LinkedIn',
   gupy: 'Gupy',
   programathor: 'Programathor',
+  amplagestao: 'Ampla Gestão',
   careerjet: 'Careerjet',
   google_jobs: 'Google Jobs',
 }

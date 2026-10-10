@@ -1,6 +1,6 @@
 # Job Scraper
 
-Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Careerjet e Google Jobs, enriquece com IA
+Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Ampla Gestão, Careerjet e Google Jobs, enriquece com IA
 (campos estruturados + score de aderência ao seu perfil) e mostra tudo num feed.
 
 ```
@@ -10,6 +10,7 @@ VM Oracle (worker Python)                    Vercel (TanStack Start)
 │  ├ linkedin.py  (HTTP)     │               │ @supabase/ssr (anon) │
 │  ├ gupy.py      (HTTP)     │               └──────────┬───────────┘
 │  ├ programathor (HTTP)     │                          │
+│  ├ amplagestao  (HTTP)     │                          │
 │  ├ careerjet.py (HTTP)     │                          │
 │  ├ google_jobs.py (Bota)   │                          │
 │  ├ ai/enrich.py (Zen)      │                          │ RLS
@@ -37,6 +38,7 @@ Medido nesta VM em ago/2026, para o termo "desenvolvedor":
 | **LinkedIn** | API `jobs-guest`, HTTP puro | ~50/rodada, 6/6h | Descrição completa; URL direta |
 | **Gupy** | API JSON pública, sem auth | **554** por termo, 100/página | Melhor estruturada: modalidade, skills, URL direta |
 | **Programathor** | HTML server-side + JSON-LD | 15/página | Só TI; senioridade, contrato e salário declarados pelo anunciante |
+| **Ampla Gestão** | HTML server-side (LinkVagas) + JSON-LD | ~20 no portal, sem busca | Consultoria de RH de Pelotas; keywords e cidade filtradas por nós |
 | **Careerjet** | API v4, Basic auth | 1917 hits, 99/página | Agregadora, ~39% com salário. **Exige API key grátis** |
 | **Google Jobs** | Botasaurus | ~10/dia, quase sempre bloqueado | Best-effort |
 
@@ -140,7 +142,7 @@ Deploy: push para o Git e importar na Vercel. Ela detecta TanStack Start e o
 ## Comandos do worker
 
 ```bash
-python run.py --source all --once          # LinkedIn + Gupy + Programathor + Careerjet, na ordem do dedup
+python run.py --source all --once          # LinkedIn, Gupy, Programathor, Ampla, Careerjet (ordem do dedup)
 python run.py --source gupy --once         # uma fonte só
 python run.py --source google_jobs --once  # best-effort, fora do 'all' de propósito
 python run.py --queue                      # drena os pedidos do botão "Buscar agora"

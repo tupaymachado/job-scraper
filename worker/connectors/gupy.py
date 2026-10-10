@@ -36,13 +36,13 @@ import logging
 import random
 import re
 import time
-import unicodedata
 from datetime import datetime
 from typing import Any, Callable
 
 import requests
 
 from connectors.base import register
+from location import parse_location, same_place
 from models import RawJob, SearchProfile, SourceBlocked
 from sanitize import sanitize_html
 
@@ -62,51 +62,8 @@ USER_AGENT = (
 WORKPLACE_MAP = {"remote": "remoto", "hybrid": "hibrido", "on-site": "presencial"}
 
 
-UF_NAMES = {
-    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
-    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
-    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
-    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
-    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro",
-    "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia",
-    "RR": "Roraima", "SC": "Santa Catarina", "SP": "São Paulo", "SE": "Sergipe",
-    "TO": "Tocantins",
-}
-
-# Local que é o país inteiro não restringe nada (perfis antigos usam "Brazil").
-COUNTRY_NAMES = {"brazil", "brasil", "br"}
-
-
-def _fold(text: str | None) -> str:
-    """Minúsculas e sem acento, para comparar 'São Paulo' com 'Sao Paulo'."""
-    normalized = unicodedata.normalize("NFKD", (text or "").strip().lower())
-    return "".join(c for c in normalized if not unicodedata.combining(c))
-
-
-def _parse_location(location: str | None) -> tuple[str | None, str | None]:
-    """'Pelotas, RS' -> ('Pelotas', 'Rio Grande do Sul'). País inteiro -> (None, None).
-
-    Aceita 'Cidade, UF', 'Cidade - UF', 'Cidade/UF' e só 'Cidade'.
-    """
-    if not location or _fold(location) in COUNTRY_NAMES:
-        return None, None
-
-    parts = [p.strip() for p in re.split(r"[,/]|\s-\s", location) if p.strip()]
-    parts = [p for p in parts if _fold(p) not in COUNTRY_NAMES]
-    if not parts:
-        return None, None
-
-    city = parts[0]
-    state = None
-    if len(parts) > 1:
-        state = UF_NAMES.get(parts[1].upper(), parts[1])
-    return city, state
-
-
 def _in_location(item: dict[str, Any], city: str, state: str | None) -> bool:
-    if _fold(item.get("city")) != _fold(city):
-        return False
-    return state is None or not item.get("state") or _fold(item["state"]) == _fold(state)
+    return same_place(item.get("city"), item.get("state"), city, state)
 
 
 def _parse_date(value: str | None) -> datetime | None:
@@ -159,7 +116,7 @@ class GupyConnector:
         self.session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
 
     def search(self, profile: SearchProfile, limit: int = 100) -> list[RawJob]:
-        city, state = _parse_location(profile.location)
+        city, state = parse_location(profile.location)
 
         if profile.remote_only or not city:
             # Sem cidade (ou só remoto) o local não restringe: busca única.

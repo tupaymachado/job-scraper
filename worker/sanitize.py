@@ -54,3 +54,23 @@ def sanitize_html(html: str | None) -> str | None:
             del tag["href"]
 
     return str(soup)
+
+
+BLOCK_TAGS = ("p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "tr")
+
+
+def html_to_text(html: str | None) -> str | None:
+    """Texto puro de uma descrição em HTML, para o prompt da IA.
+
+    `get_text("\\n")` parte palavras em tag inline ("a<span>uxiliar</span>"
+    vira "a\\nuxiliar"); aqui só <br> e fim de bloco viram quebra de linha.
+    """
+    if not html:
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    for br in soup.find_all("br"):
+        br.replace_with("\n")
+    for tag in soup.find_all(BLOCK_TAGS):
+        tag.append("\n")
+    lines = (" ".join(line.split()) for line in soup.get_text().splitlines())
+    return "\n".join(line for line in lines if line) or None
