@@ -18,6 +18,15 @@ marketing e city/state vazios — o _company() já trata.
 
 Validado out/2026 desta VM: HTTP 200 direto via requests, sem cookie nem
 token; detalhe da vaga continua em <careerPageUrl>/job/<id>.
+
+LOCALIZAÇÃO: `jobName` sozinho ignora o local — "administrativo" devolve
+~3000 vagas do Brasil inteiro e as de Pelotas nunca chegam nas primeiras
+páginas. O parâmetro `city=<nome>` filtra no servidor (medido out/2026:
+6 vagas "administrativo" em Pelotas); `state` só aceita o nome por extenso
+("Rio Grande do Sul", não "RS"). Para perfil com cidade, fazemos duas
+buscas — a da cidade e a das remotas, que valem de qualquer lugar — e
+pós-filtramos tudo por city/state, porque o filtro do servidor não é
+documentado e pode mudar sem aviso.
 """
 
 from __future__ import annotations
@@ -27,8 +36,9 @@ import logging
 import random
 import re
 import time
+import unicodedata
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 import requests
 
@@ -50,6 +60,53 @@ USER_AGENT = (
 
 # Vocabulário da Gupy -> nosso vocabulário.
 WORKPLACE_MAP = {"remote": "remoto", "hybrid": "hibrido", "on-site": "presencial"}
+
+
+UF_NAMES = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
+    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
+    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
+    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
+    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte", "RS": "Rio Grande do Sul", "RO": "Rondônia",
+    "RR": "Roraima", "SC": "Santa Catarina", "SP": "São Paulo", "SE": "Sergipe",
+    "TO": "Tocantins",
+}
+
+# Local que é o país inteiro não restringe nada (perfis antigos usam "Brazil").
+COUNTRY_NAMES = {"brazil", "brasil", "br"}
+
+
+def _fold(text: str | None) -> str:
+    """Minúsculas e sem acento, para comparar 'São Paulo' com 'Sao Paulo'."""
+    normalized = unicodedata.normalize("NFKD", (text or "").strip().lower())
+    return "".join(c for c in normalized if not unicodedata.combining(c))
+
+
+def _parse_location(location: str | None) -> tuple[str | None, str | None]:
+    """'Pelotas, RS' -> ('Pelotas', 'Rio Grande do Sul'). País inteiro -> (None, None).
+
+    Aceita 'Cidade, UF', 'Cidade - UF', 'Cidade/UF' e só 'Cidade'.
+    """
+    if not location or _fold(location) in COUNTRY_NAMES:
+        return None, None
+
+    parts = [p.strip() for p in re.split(r"[,/]|\s-\s", location) if p.strip()]
+    parts = [p for p in parts if _fold(p) not in COUNTRY_NAMES]
+    if not parts:
+        return None, None
+
+    city = parts[0]
+    state = None
+    if len(parts) > 1:
+        state = UF_NAMES.get(parts[1].upper(), parts[1])
+    return city, state
+
+
+def _in_location(item: dict[str, Any], city: str, state: str | None) -> bool:
+    if _fold(item.get("city")) != _fold(city):
+        return False
+    return state is None or not item.get("state") or _fold(item["state"]) == _fold(state)
 
 
 def _parse_date(value: str | None) -> datetime | None:
@@ -102,31 +159,74 @@ class GupyConnector:
         self.session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
 
     def search(self, profile: SearchProfile, limit: int = 100) -> list[RawJob]:
+        city, state = _parse_location(profile.location)
+
+        if profile.remote_only or not city:
+            # Sem cidade (ou só remoto) o local não restringe: busca única.
+            extra = {"workplaceType": "remote"} if profile.remote_only else {}
+            return self._collect(profile.keywords, extra, limit, keep=None)
+
+        # Com cidade: primeiro as vagas dela, depois as remotas preenchem o
+        # que sobrar do limite. Remota vale de qualquer lugar, então entra.
+        def keep(item: dict[str, Any]) -> bool:
+            return item.get("workplaceType") == "remote" or _in_location(item, city, state)
+
+        local_params = {"city": city}
+        if state:
+            local_params["state"] = state
+        jobs = self._collect(profile.keywords, local_params, limit, keep=keep)
+        log.info("Gupy: %d vagas em %s", len(jobs), city)
+
+        if len(jobs) < limit:
+            seen = {j.source_job_id for j in jobs}
+            remote = self._collect(
+                profile.keywords, {"workplaceType": "remote"}, limit - len(jobs),
+                keep=keep, seen=seen, has_results=bool(jobs),
+            )
+            log.info("Gupy: + %d remotas", len(remote))
+            jobs.extend(remote)
+
+        return jobs[:limit]
+
+    def _collect(
+        self,
+        keywords: str,
+        extra_params: dict[str, Any],
+        limit: int,
+        keep: Callable[[dict[str, Any]], bool] | None,
+        seen: set[str] | None = None,
+        has_results: bool = False,
+    ) -> list[RawJob]:
+        """Pagina uma busca. `keep` é o pós-filtro aplicado item a item.
+
+        `has_results` diz se uma busca anterior do mesmo perfil já colheu
+        algo: aí um erro aqui não é bloqueio, só fim antecipado.
+        """
         jobs: list[RawJob] = []
-        seen: set[str] = set()
+        seen = set(seen or ())
 
         for page in range(MAX_PAGES):
             if len(jobs) >= limit:
                 break
 
             params: dict[str, Any] = {
-                "jobName": profile.keywords,
+                "jobName": keywords,
                 "limit": PAGE_SIZE,
                 "offset": page * PAGE_SIZE,
+                **extra_params,
             }
-            if profile.remote_only:
-                params["workplaceType"] = "remote"
 
             resp = self.session.get(API_URL, params=params, timeout=30)
+            collected = bool(jobs) or has_results
 
             if resp.status_code == 429:
                 log.warning("Gupy 429 na página %d (%d colhidas)", page, len(jobs))
-                if not jobs:
+                if not collected:
                     raise SourceBlocked("Gupy respondeu 429 já na primeira página")
                 break
             if resp.status_code != 200:
                 log.warning("Gupy HTTP %d na página %d", resp.status_code, page)
-                if not jobs:
+                if not collected:
                     raise SourceBlocked(f"Gupy respondeu HTTP {resp.status_code}")
                 break
 
@@ -135,6 +235,8 @@ class GupyConnector:
                 break
 
             for item in items:
+                if keep is not None and not keep(item):
+                    continue
                 job = self._to_raw_job(item)
                 if job and job.source_job_id not in seen:
                     seen.add(job.source_job_id)
@@ -188,13 +290,16 @@ def _factory() -> GupyConnector:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Testa o conector Gupy isoladamente")
     parser.add_argument("--keywords", required=True)
+    parser.add_argument("--location", default=None, help='ex: "Pelotas, RS"')
     parser.add_argument("--remote-only", action="store_true")
     parser.add_argument("--limit", type=int, default=10)
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
-    profile = SearchProfile(id=None, keywords=args.keywords, remote_only=args.remote_only)
+    profile = SearchProfile(
+        id=None, keywords=args.keywords, location=args.location, remote_only=args.remote_only
+    )
     jobs = GupyConnector().search(profile, limit=args.limit)
 
     print(f"\n{len(jobs)} vagas\n")
