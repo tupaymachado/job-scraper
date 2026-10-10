@@ -9,6 +9,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   amplagestao: 'Ampla Gestão',
   harmona: 'Harmona',
   incompany: 'InCompany',
+  vagascom: 'Vagas.com',
   careerjet: 'Careerjet',
   google_jobs: 'Google Jobs',
 }

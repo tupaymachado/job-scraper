@@ -27,6 +27,7 @@ const ALL_SOURCES: { value: JobSource; label: string; hint: string }[] = [
   { value: 'amplagestao', label: 'Ampla Gestão', hint: 'Consultoria de RH de Pelotas, ~20 vagas da região sul do RS' },
   { value: 'harmona', label: 'Harmona', hint: 'Consultoria de RH (Selecty). 1x/dia; hoje dá 403 para a VM' },
   { value: 'incompany', label: 'InCompany', hint: 'Consultoria de RH (Selecty). 1x/dia; hoje dá 403 para a VM' },
+  { value: 'vagascom', label: 'Vagas.com', hint: 'Board generalista grande; filtra por estado, cidade é pós-filtro' },
   { value: 'careerjet', label: 'Careerjet', hint: 'Agregadora, com salário. Exige API key grátis' },
   { value: 'google_jobs', label: 'Google Jobs', hint: '~10 vagas/dia, quase sempre bloqueado' },
 ]

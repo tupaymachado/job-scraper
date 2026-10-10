@@ -10,6 +10,7 @@ const SOURCES = [
   { value: 'amplagestao', label: 'Ampla Gestão' },
   { value: 'harmona', label: 'Harmona' },
   { value: 'incompany', label: 'InCompany' },
+  { value: 'vagascom', label: 'Vagas.com' },
   { value: 'careerjet', label: 'Careerjet' },
   { value: 'google_jobs', label: 'Google Jobs' },
 ]

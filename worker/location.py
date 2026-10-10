@@ -34,7 +34,8 @@ def fold(text: str | None) -> str:
 def parse_location(location: str | None) -> tuple[str | None, str | None]:
     """'Pelotas, RS' -> ('Pelotas', 'Rio Grande do Sul'). País inteiro -> (None, None).
 
-    Aceita 'Cidade, UF', 'Cidade - UF', 'Cidade/UF' e só 'Cidade'.
+    Aceita 'Cidade, UF', 'Cidade - UF', 'Cidade/UF', só 'Cidade' e só o
+    estado ('RS' -> (None, 'Rio Grande do Sul')).
     """
     if not location or fold(location) in COUNTRY_NAMES:
         return None, None
@@ -44,11 +45,22 @@ def parse_location(location: str | None) -> tuple[str | None, str | None]:
     if not parts:
         return None, None
 
-    city = parts[0]
-    state = None
-    if len(parts) > 1:
-        state = UF_NAMES.get(parts[1].upper(), parts[1])
-    return city, state
+    if len(parts) == 1:
+        # Só o estado ("RS", "Rio Grande do Sul") não é cidade.
+        state = _state_name(parts[0])
+        return (None, state) if state else (parts[0], None)
+
+    return parts[0], _state_name(parts[1]) or parts[1]
+
+
+def _state_name(text: str) -> str | None:
+    """'RS' ou 'rio grande do sul' -> 'Rio Grande do Sul'; None se não for estado."""
+    if text.strip().upper() in UF_NAMES:
+        return UF_NAMES[text.strip().upper()]
+    for name in UF_NAMES.values():
+        if fold(name) == fold(text):
+            return name
+    return None
 
 
 def same_place(city: str | None, state: str | None, want_city: str, want_state: str | None) -> bool:

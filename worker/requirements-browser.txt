@@ -2,4 +2,4 @@
 # Precisa de Chrome/Chromium instalado na máquina.
 #   ../.venv/bin/pip install -r requirements-browser.txt
 -r requirements.txt
-botasaurus
+botasaurus==4.0.97

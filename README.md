@@ -1,6 +1,6 @@
 # Job Scraper
 
-Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Ampla Gestão, Careerjet, portais Selecty
+Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Ampla Gestão, Vagas.com, Careerjet, portais Selecty
 (Harmona, InCompany) e Google Jobs, enriquece com IA
 (campos estruturados + score de aderência ao seu perfil) e mostra tudo num feed.
 
@@ -12,6 +12,7 @@ VM Oracle (worker Python)                    Vercel (TanStack Start)
 │  ├ gupy.py      (HTTP)     │               └──────────┬───────────┘
 │  ├ programathor (HTTP)     │                          │
 │  ├ amplagestao  (HTTP)     │                          │
+│  ├ vagascom.py  (HTTP)     │                          │
 │  ├ careerjet.py (HTTP)     │                          │
 │  ├ selecty.py   (Bota)     │                          │
 │  ├ google_jobs.py (Bota)   │                          │
@@ -41,6 +42,7 @@ Medido nesta VM em ago/2026, para o termo "desenvolvedor":
 | **Gupy** | API JSON pública, sem auth | **554** por termo, 100/página | Melhor estruturada: modalidade, skills, URL direta |
 | **Programathor** | HTML server-side + JSON-LD | 15/página | Só TI; senioridade, contrato e salário declarados pelo anunciante |
 | **Ampla Gestão** | HTML server-side (LinkVagas) + JSON-LD | ~20 no portal, sem busca | Consultoria de RH de Pelotas; keywords e cidade filtradas por nós |
+| **Vagas.com** | HTML server-side + JSON-LD | 40/página | Generalista grande. Só filtra por **estado** no servidor; a cidade é pós-filtro nosso |
 | **Harmona / InCompany** | Portais Selecty, Botasaurus, 1x/dia | — | **403 para IP de datacenter** (nginx, sem challenge): hoje sempre `blocked`. Ver TODO em `worker/connectors/selecty.py` |
 | **Careerjet** | API v4, Basic auth | 1917 hits, 99/página | Agregadora, ~39% com salário. **Exige API key grátis** |
 | **Google Jobs** | Botasaurus | ~10/dia, quase sempre bloqueado | Best-effort |
@@ -145,7 +147,7 @@ Deploy: push para o Git e importar na Vercel. Ela detecta TanStack Start e o
 ## Comandos do worker
 
 ```bash
-python run.py --source all --once          # LinkedIn, Gupy, Programathor, Ampla, Careerjet (ordem do dedup)
+python run.py --source all --once          # fontes HTTP: LinkedIn, Gupy, Programathor, Ampla, Vagas.com, Careerjet
 python run.py --source gupy --once         # uma fonte só
 python run.py --source browser --once      # Selecty + Google Jobs (Chromium), 1x/dia, fora do 'all'
 python run.py --source google_jobs --once  # uma fonte de browser só

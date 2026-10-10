@@ -1,5 +1,5 @@
 [Unit]
-Description=Job Scraper — coleta LinkedIn + Gupy + Programathor + Careerjet
+Description=Job Scraper — coleta das fontes HTTP (LinkedIn, Gupy, Programathor, Ampla, Vagas.com, Careerjet)
 After=network-online.target
 Wants=network-online.target
 

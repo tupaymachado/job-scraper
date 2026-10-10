@@ -23,6 +23,7 @@ import connectors.gupy  # noqa: F401
 import connectors.linkedin  # noqa: F401
 import connectors.programathor  # noqa: F401
 import connectors.selecty  # noqa: F401
+import connectors.vagascom  # noqa: F401
 from connectors.base import REGISTRY, get_connector
 from connectors.careerjet import MissingApiKey
 from models import SearchProfile, SourceBlocked
@@ -30,7 +31,7 @@ from store import Store
 
 log = logging.getLogger("worker")
 
-DETAIL_SOURCES = {"linkedin", "programathor", "amplagestao"}  # fontes cujo conector tem fetch_detail()
+DETAIL_SOURCES = {"linkedin", "programathor", "amplagestao", "vagascom"}  # fontes cujo conector tem fetch_detail()
 
 # Ordem de coleta = ordem de preferência no dedup: a primeira fonte a ver
 # uma vaga vira a canônica e é o link que o usuário abre.
@@ -41,14 +42,14 @@ DETAIL_SOURCES = {"linkedin", "programathor", "amplagestao"}  # fontes cujo cone
 # roubar o link bom de quem chegou antes.
 SOURCE_ORDER = [
     "linkedin", "gupy", "programathor", "amplagestao", "harmona", "incompany",
-    "careerjet", "google_jobs",
+    "vagascom", "careerjet", "google_jobs",
 ]
 
 # O que `--source all` roda. O google_jobs fica DE FORA porque o Google
 # flagra o IP após um acesso automatizado: ele tem timer próprio, 1x/dia.
 # Incluí-lo aqui faria a coleta de 6h em 6h queimar o IP e encher o
 # scrape_runs de 'blocked' sem colher nada.
-BULK_SOURCES = ["linkedin", "gupy", "programathor", "amplagestao", "careerjet"]
+BULK_SOURCES = ["linkedin", "gupy", "programathor", "amplagestao", "vagascom", "careerjet"]
 
 # O que `--source browser` roda, 1x/dia (timer job-scraper-browser): fontes
 # que sobem Chromium via Botasaurus. Caras, e bloqueio é o resultado normal —

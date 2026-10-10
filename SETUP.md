@@ -134,7 +134,7 @@ Todos os comandos do worker rodam a partir de `worker/`, com o venv do projeto:
 
 | Timer | Frequência | O quê |
 |---|---|---|
-| `collect` | 6/6h | LinkedIn + Gupy + Programathor + Careerjet |
+| `collect` | 6/6h | fontes HTTP: LinkedIn, Gupy, Programathor, Ampla Gestão, Vagas.com, Careerjet |
 | `queue` | 60s | atende o botão "Buscar agora" do app |
 | `enrich` | 2/2h | extrai campos estruturados com IA |
 | `match` | 2/2h (30 min após o enrich) | score contra o CV de `MATCH_USER_ID` |

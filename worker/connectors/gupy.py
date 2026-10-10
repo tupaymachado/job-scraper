@@ -62,7 +62,9 @@ USER_AGENT = (
 WORKPLACE_MAP = {"remote": "remoto", "hybrid": "hibrido", "on-site": "presencial"}
 
 
-def _in_location(item: dict[str, Any], city: str, state: str | None) -> bool:
+def _in_location(item: dict[str, Any], city: str | None, state: str | None) -> bool:
+    if city is None:  # só estado
+        return same_place(item.get("state"), None, state or "", None)
     return same_place(item.get("city"), item.get("state"), city, state)
 
 
@@ -118,21 +120,23 @@ class GupyConnector:
     def search(self, profile: SearchProfile, limit: int = 100) -> list[RawJob]:
         city, state = parse_location(profile.location)
 
-        if profile.remote_only or not city:
-            # Sem cidade (ou só remoto) o local não restringe: busca única.
+        if profile.remote_only or not (city or state):
+            # Sem local (ou só remoto) nada restringe: busca única.
             extra = {"workplaceType": "remote"} if profile.remote_only else {}
             return self._collect(profile.keywords, extra, limit, keep=None)
 
-        # Com cidade: primeiro as vagas dela, depois as remotas preenchem o
+        # Com local: primeiro as vagas dele, depois as remotas preenchem o
         # que sobrar do limite. Remota vale de qualquer lugar, então entra.
         def keep(item: dict[str, Any]) -> bool:
             return item.get("workplaceType") == "remote" or _in_location(item, city, state)
 
-        local_params = {"city": city}
+        local_params = {}
+        if city:
+            local_params["city"] = city
         if state:
             local_params["state"] = state
         jobs = self._collect(profile.keywords, local_params, limit, keep=keep)
-        log.info("Gupy: %d vagas em %s", len(jobs), city)
+        log.info("Gupy: %d vagas em %s", len(jobs), city or state)
 
         if len(jobs) < limit:
             seen = {j.source_job_id for j in jobs}
