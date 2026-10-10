@@ -4,8 +4,8 @@ Ordem importa. O ponto que costuma pegar: **o worker não coleta nada até exist
 um perfil de busca**, e perfil de busca pertence a um usuário — então o app web e
 o login vêm **antes** da primeira coleta.
 
-Todos os comandos do worker rodam a partir de `worker/`, com
-`~/botasaurus-env/bin/python`.
+Todos os comandos do worker rodam a partir de `worker/`, com o venv do projeto:
+`../.venv/bin/python` (criado no passo 3).
 
 ---
 
@@ -30,6 +30,9 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 - [ ] No *SQL Editor* do Supabase, rodar **em ordem**:
   - [ ] `supabase/migrations/0001_init.sql` — tabelas, índices, RLS
   - [ ] `supabase/migrations/0002_dedup.sql` — colunas de dedup
+  - [ ] `supabase/migrations/0003_feed_score.sql` — view `jobs_feed` (score no feed)
+  - [ ] `supabase/migrations/0004_feed_discarded_last.sql` — descartadas no fim do feed
+        (sem 0003/0004 o feed do app quebra: ele lê da view `jobs_feed`)
 - [ ] Conferir em *Table Editor* que apareceram 8 tabelas (`jobs`, `job_enrichments`,
       `job_matches`, `job_status`, `user_profiles`, `search_profiles`,
       `scrape_requests`, `scrape_runs`)
@@ -38,20 +41,29 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 
 ## 3. Worker: credenciais e teste a seco
 
+- [ ] Criar o venv do projeto (os units do systemd apontam para ele):
+      ```bash
+      cd ~/projects/job-scraper
+      python3 -m venv .venv
+      .venv/bin/pip install -r worker/requirements.txt
+      # só se for usar google_jobs (Botasaurus + Chromium):
+      # .venv/bin/pip install -r worker/requirements-browser.txt
+      ```
 - [ ] ```bash
       cd ~/projects/job-scraper/worker
       cp .env.example .env && chmod 600 .env
       ```
 - [ ] Preencher `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENCODE_API_KEY`
-      (e `CAREERJET_AFFID` se tiver)
+      (e `CAREERJET_AFFID` se tiver). `MATCH_USER_ID` vem no passo 4
 - [ ] Testar os conectores **sem tocar no banco** — se isto funciona, a coleta funciona:
       ```bash
-      ~/botasaurus-env/bin/python -m connectors.linkedin \
+      ../.venv/bin/python -m connectors.linkedin \
           --keywords "desenvolvedor react" --location Brazil --limit 10 --detail --dry-run
-      ~/botasaurus-env/bin/python -m connectors.gupy --keywords "desenvolvedor react" --limit 10
-      ~/botasaurus-env/bin/python -m connectors.careerjet --keywords "desenvolvedor react"
+      ../.venv/bin/python -m connectors.gupy --keywords "desenvolvedor react" --limit 10
+      ../.venv/bin/python -m connectors.programathor --keywords react --limit 10
+      ../.venv/bin/python -m connectors.careerjet --keywords "desenvolvedor react"
       ```
-      **Esperado:** LinkedIn e Gupy listam vagas com título/empresa/local.
+      **Esperado:** LinkedIn, Gupy e Programathor listam vagas com título/empresa/local.
       Careerjet sem chave imprime "CAREERJET_AFFID não configurada" — isso é ok.
 
 ## 4. Web local e primeiro login
@@ -65,7 +77,8 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 - [ ] Abrir http://localhost:3000, entrar com seu e-mail, clicar no magic link
 - [ ] Em **Perfil**, colar seu CV e as preferências → *Salvar*
       (é o que a IA usa para calcular o score; sem isso o match não roda)
-- [ ] **Anotar o seu user id** — aparece no rodapé da página Perfil, no comando sugerido
+- [ ] **Anotar o seu user id** — aparece no rodapé da página Perfil, no comando sugerido.
+      Colocar em `MATCH_USER_ID` no `worker/.env` (é o que o timer do `ai.match` usa)
 - [ ] Em **Buscas**, criar um perfil de busca (ex: `desenvolvedor react`, `Brazil`,
       fontes LinkedIn + Gupy) → *Criar busca*
 
@@ -73,7 +86,7 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 
 - [ ] ```bash
       cd ~/projects/job-scraper/worker
-      ~/botasaurus-env/bin/python run.py --source all --once
+      ../.venv/bin/python run.py --source all --once
       ```
       **Esperado:** log com `X vagas encontradas` e `Y novas gravadas` por fonte
 - [ ] Rodar **de novo** o mesmo comando
@@ -86,12 +99,12 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 ## 6. IA
 
 - [ ] ```bash
-      ~/botasaurus-env/bin/python -m ai.enrich --limit 10
+      ../.venv/bin/python -m ai.enrich --limit 10
       ```
       **Esperado:** uma linha `✓` por vaga. Conferir em `job_enrichments` que
       `stack` e `seniority` vieram preenchidos
 - [ ] ```bash
-      ~/botasaurus-env/bin/python -m ai.match --user-id <seu-user-id>
+      ../.venv/bin/python -m ai.match   # usa MATCH_USER_ID; ou --user-id <uuid>
       ```
       **Esperado:** linhas com score de 0 a 100. No feed, as vagas passam a
       mostrar o badge de score
@@ -109,9 +122,10 @@ Todos os comandos do worker rodam a partir de `worker/`, com
           job-scraper-collect.timer \
           job-scraper-queue.timer \
           job-scraper-enrich.timer \
+          job-scraper-match.timer \
           job-scraper-google.timer
       ```
-- [ ] `systemctl --user list-timers` — os 4 devem aparecer com próximo disparo
+- [ ] `systemctl --user list-timers` — os 5 devem aparecer com próximo disparo
 - [ ] Testar um serviço na mão e ver o log:
       ```bash
       systemctl --user start job-scraper-collect.service
@@ -120,14 +134,15 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 
 | Timer | Frequência | O quê |
 |---|---|---|
-| `collect` | 6/6h | LinkedIn + Gupy + Careerjet |
+| `collect` | 6/6h | LinkedIn + Gupy + Programathor + Careerjet |
 | `queue` | 60s | atende o botão "Buscar agora" do app |
 | `enrich` | 2/2h | extrai campos estruturados com IA |
+| `match` | 2/2h (30 min após o enrich) | score contra o CV de `MATCH_USER_ID` |
 | `google` | 1x/dia | Google Jobs, best-effort |
 
 > `job-scraper-google` vindo `blocked` é o **comportamento esperado**, não falha.
-> O `ai.match` não tem timer: ele depende do seu user id, então roda na mão
-> (ou você adiciona um timer com o id fixo depois).
+> O timer `match` lê o user id de `MATCH_USER_ID` no `worker/.env` — sem ele o
+> serviço sai com erro. O id fica fora do unit porque o repo é público.
 
 ## 8. Deploy na Vercel
 
@@ -154,7 +169,7 @@ Todos os comandos do worker rodam a partir de `worker/`, com
 - [ ] Feed mostra vagas com badge de fonte e score
 - [ ] Filtros (fonte, senioridade, modelo, score) funcionam
 - [ ] Salvar / Candidatei / Descartar persistem ao recarregar
-- [ ] `systemctl --user list-timers` mostra os 4 timers ativos
+- [ ] `systemctl --user list-timers` mostra os 5 timers ativos
 - [ ] `select status, count(*) from scrape_runs group by status;` — a maioria `ok`,
       `blocked` só em `google_jobs`
 

@@ -1,0 +1,5 @@
+# Só para os conectores que sobem browser (Botasaurus): google_jobs e os da Selecty.
+# Precisa de Chrome/Chromium instalado na máquina.
+#   ../.venv/bin/pip install -r requirements-browser.txt
+-r requirements.txt
+botasaurus

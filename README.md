@@ -1,6 +1,6 @@
 # Job Scraper
 
-Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Careerjet e Google Jobs, enriquece com IA
+Webapp mobile-first que coleta vagas do LinkedIn, Gupy, Programathor, Careerjet e Google Jobs, enriquece com IA
 (campos estruturados + score de aderência ao seu perfil) e mostra tudo num feed.
 
 ```
@@ -9,6 +9,7 @@ VM Oracle (worker Python)                    Vercel (TanStack Start)
 │ systemd timers             │               │ rotas + server fns   │
 │  ├ linkedin.py  (HTTP)     │               │ @supabase/ssr (anon) │
 │  ├ gupy.py      (HTTP)     │               └──────────┬───────────┘
+│  ├ programathor (HTTP)     │                          │
 │  ├ careerjet.py (HTTP)     │                          │
 │  ├ google_jobs.py (Bota)   │                          │
 │  ├ ai/enrich.py (Zen)      │                          │ RLS
@@ -24,7 +25,7 @@ VM Oracle (worker Python)                    Vercel (TanStack Start)
 | Diretório | O quê |
 |---|---|
 | [web/](web/) | TanStack Start + Tailwind + TanStack Query → Vercel |
-| [worker/](worker/) | Python, roda em `~/botasaurus-env` na VM |
+| [worker/](worker/) | Python, roda no venv do projeto (`.venv/`) na VM |
 | [supabase/](supabase/) | Migrations SQL |
 
 ## As fontes não são equivalentes
@@ -35,6 +36,7 @@ Medido nesta VM em ago/2026, para o termo "desenvolvedor":
 |---|---|---|---|
 | **LinkedIn** | API `jobs-guest`, HTTP puro | ~50/rodada, 6/6h | Descrição completa; URL direta |
 | **Gupy** | API JSON pública, sem auth | **554** por termo, 100/página | Melhor estruturada: modalidade, skills, URL direta |
+| **Programathor** | HTML server-side + JSON-LD | 15/página | Só TI; senioridade, contrato e salário declarados pelo anunciante |
 | **Careerjet** | API v4, Basic auth | 1917 hits, 99/página | Agregadora, ~39% com salário. **Exige API key grátis** |
 | **Google Jobs** | Botasaurus | ~10/dia, quase sempre bloqueado | Best-effort |
 
@@ -83,22 +85,29 @@ O resumo abaixo assume que você já sabe o que está fazendo.
 
 ### 1. Supabase
 
-Aplique as migrations do [supabase/migrations/](supabase/migrations/) **em ordem** no
-SQL Editor do dashboard: `0001_init.sql` (tabelas, índices, RLS) e depois
-`0002_dedup.sql` (colunas de dedup).
+Aplique **todas** as migrations do [supabase/migrations/](supabase/migrations/) **em ordem**
+no SQL Editor do dashboard: `0001_init.sql` (tabelas, índices, RLS), `0002_dedup.sql`
+(colunas de dedup), `0003_feed_score.sql` e `0004_feed_discarded_last.sql` (view
+`jobs_feed` — sem elas o feed do app quebra).
 
 ### 2. Worker (na VM)
 
 ```bash
+python3 -m venv .venv
+.venv/bin/pip install -r worker/requirements.txt
+# opcional, só para google_jobs (Botasaurus + Chromium):
+# .venv/bin/pip install -r worker/requirements-browser.txt
+
 cd worker
-cp .env.example .env && chmod 600 .env   # SUPABASE_*, OPENCODE_API_KEY, CAREERJET_AFFID
+cp .env.example .env && chmod 600 .env   # SUPABASE_*, OPENCODE_API_KEY, CAREERJET_AFFID, MATCH_USER_ID
 
 # Conectores rodam isolados, sem tocar no Supabase — dá para conferir a
 # coleta antes de configurar qualquer credencial:
-~/botasaurus-env/bin/python -m connectors.linkedin \
+../.venv/bin/python -m connectors.linkedin \
     --keywords "desenvolvedor react" --location Brazil --limit 10 --detail --dry-run
-~/botasaurus-env/bin/python -m connectors.gupy --keywords "desenvolvedor react" --limit 10
-~/botasaurus-env/bin/python -m connectors.careerjet --keywords "desenvolvedor react"
+../.venv/bin/python -m connectors.gupy --keywords "desenvolvedor react" --limit 10
+../.venv/bin/python -m connectors.programathor --keywords react --limit 10
+../.venv/bin/python -m connectors.careerjet --keywords "desenvolvedor react"
 ```
 
 Timers:
@@ -108,8 +117,8 @@ loginctl enable-linger ubuntu                    # sobrevive a logout
 mkdir -p ~/.config/systemd/user
 cp worker/systemd/* ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now job-scraper-collect.timer \
-    job-scraper-google.timer job-scraper-queue.timer job-scraper-enrich.timer
+systemctl --user enable --now job-scraper-collect.timer job-scraper-google.timer \
+    job-scraper-queue.timer job-scraper-enrich.timer job-scraper-match.timer
 systemctl --user list-timers
 ```
 
@@ -131,15 +140,15 @@ Deploy: push para o Git e importar na Vercel. Ela detecta TanStack Start e o
 ## Comandos do worker
 
 ```bash
-python run.py --source all --once          # LinkedIn + Gupy + Careerjet, na ordem do dedup
+python run.py --source all --once          # LinkedIn + Gupy + Programathor + Careerjet, na ordem do dedup
 python run.py --source gupy --once         # uma fonte só
 python run.py --source google_jobs --once  # best-effort, fora do 'all' de propósito
 python run.py --queue                      # drena os pedidos do botão "Buscar agora"
 python -m ai.enrich --limit 20             # extrai campos estruturados
-python -m ai.match --user-id <uuid>        # calcula score de aderência
+python -m ai.match                         # score de aderência (MATCH_USER_ID do .env, ou --user-id)
 ```
 
-Todos com `~/botasaurus-env/bin/python`, a partir de `worker/`.
+Todos com `../.venv/bin/python`, a partir de `worker/`.
 
 ## Notas de implementação
 
@@ -159,8 +168,8 @@ junto da coleta de 6/6h só queimaria o IP e encheria `scrape_runs` de `blocked`
 orçamento de rate limit, então `run.py` consulta os IDs já conhecidos antes.
 
 **PostgREST direto, sem SDK.** O worker fala com o Supabase via `requests` em
-[worker/store.py](worker/store.py). O `~/botasaurus-env` é compartilhado com outras
-ferramentas e o supabase-py arrastaria httpx/pydantic/gotrue para dentro dele.
+[worker/store.py](worker/store.py). O supabase-py arrastaria httpx/pydantic/gotrue
+para o venv só para meia dúzia de chamadas REST.
 
 **Bun local, Node no deploy.** O runtime Bun da Vercel está em beta e ainda não
 cobre TanStack Start. Quando cobrir, é uma linha (`"bunVersion": "1.x"`) no

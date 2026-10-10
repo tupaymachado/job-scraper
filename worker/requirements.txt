@@ -1,0 +1,6 @@
+# Dependências do worker (conectores HTTP, store, IA).
+#   python3 -m venv ../.venv && ../.venv/bin/pip install -r requirements.txt
+requests==2.34.2
+beautifulsoup4==4.15.0
+
+# Conectores com browser (google_jobs, selecty) — opcional, ver requirements-browser.txt

@@ -1,8 +1,8 @@
 """Acesso ao Supabase via PostgREST.
 
-Usa `requests` direto em vez do SDK supabase-py de propósito: o venv
-~/botasaurus-env é compartilhado com outras ferramentas e o SDK arrastaria
-httpx/pydantic/gotrue para dentro dele. A superfície que usamos é pequena.
+Usa `requests` direto em vez do SDK supabase-py de propósito: o SDK
+arrastaria httpx/pydantic/gotrue para o venv, e a superfície que usamos é
+pequena.
 
 A service_role key passa por cima da RLS — este módulo só roda na VM.
 """
