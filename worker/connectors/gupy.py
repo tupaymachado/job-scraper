@@ -3,19 +3,21 @@
 A Gupy é o ATS dominante no Brasil; milhares de empresas publicam por ela.
 O portal de vagas expõe uma API JSON sem autenticação:
 
-  GET https://employability-portal.gupy.io/api/v1/jobs
-      ?jobName=<termo>&limit=<=100&offset=<n>&workplaceType=remote|hybrid|on-site
+  GET https://portal.gupy.io/api/job-search/jobs
+      ?jobName=<termo>&limit=<n>&offset=<n>&workplaceType=remote|hybrid|onsite
 
-Validado ago/2026 desta VM: 554 vagas para "desenvolvedor", HTTP 200,
-paginação por offset conferida (offsets 0/100/200 retornam resultados
-distintos), `workplaceType` filtra de verdade.
+HISTÓRICO (out/2026): o endpoint antigo employability-portal.gupy.io/api/v1/jobs
+morreu com 404 global de nginx (confirmado por scrapers de terceiros em
+set/2026). O portal foi reescrito e hoje chama a API na própria origem,
+descoberto via devtools em portal.gupy.io/job-search. Formato da resposta:
+{data: [...jobs], pagination: {...}}. Campos do job: id, name, jobUrl,
+careerPageName, careerPageUrl, city, state, workplaceType, type,
+description (HTML), publishedDate, applicationDeadline, badges,
+disabilities. Detalhe: alguns jobs trazem careerPageName como slogan de
+marketing e city/state vazios — o _company() já trata.
 
-Esta API é MUITO melhor estruturada do que o que raspamos do LinkedIn:
-já vem com modalidade, skills, descrição e URL direta para a página da
-empresa — sem tracker no meio.
-
-Substitui a receita antiga do job-sites-pattern.md ("Gupy não tem busca
-pública, ir via Google site:gupy.io"), que herdava o captcha do Google.
+Validado out/2026 desta VM: HTTP 200 direto via requests, sem cookie nem
+token; detalhe da vaga continua em <careerPageUrl>/job/<id>.
 """
 
 from __future__ import annotations
@@ -36,10 +38,10 @@ from sanitize import sanitize_html
 
 log = logging.getLogger(__name__)
 
-API_URL = "https://employability-portal.gupy.io/api/v1/jobs"
+API_URL = "https://portal.gupy.io/api/job-search/jobs"
 
-PAGE_SIZE = 100  # máximo aceito; limit=1000 devolve HTTP 400
-MAX_PAGES = 5
+PAGE_SIZE = 50
+MAX_PAGES = 10
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
